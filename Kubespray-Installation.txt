@@ -1,0 +1,960 @@
+Install Vagrant and Oracle Virtual Box
+
+Kubernetes Install will be done with below architecture
+
+Master Node : 3
+Worker Node : 3
+Ansible Node: 1
+HA Proxy : 1
+
+Note : you can install HA proxy in one node or you can configure HA proxy with HA setup with Keep Alive
+
+Create the Vagrantfile 
+======================
+
+P1328977@NCS-140420MZ02 MINGW64 ~/Desktop/kubespray (master)
+
+vi Vagrantfile
+
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+ENV['VAGRANT_NO_PARALLEL'] = 'no'
+
+Vagrant.configure(2) do |config|
+
+  MasterNodeCount =3
+  # Kubernetes Master Server
+  (1..MasterNodeCount).each do |i|
+    config.vm.define "master#{i}" do |masternode|
+      masternode.vm.box = "centos/7"
+      masternode.vm.hostname = "master#{i}.example.com"
+      masternode.vm.network "private_network", ip: "172.42.42.1#{i}"
+      masternode.vm.provision :shell, inline: "cat /vagrant/ssh-key.pub >> .ssh/authorized_keys"
+      masternode.vm.provision :shell, inline: "cat /vagrant/id_rsa.pub >> .ssh/authorized_keys"
+      masternode.vm.provision :shell, inline: "sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config"
+      masternode.vm.provision :shell, inline: "sudo systemctl restart sshd"
+      masternode.vm.provider "virtualbox" do |v|
+        v.name = "master#{i}"
+        v.memory = 2048
+        v.cpus = 2
+        # Prevent VirtualBox from interfering with host audio stack
+        v.customize ["modifyvm", :id, "--audio", "none"]
+      end
+    end
+  end
+
+  WorkerNodeCount = 3
+
+  # Kubernetes Worker Nodes
+  (1..  WorkerNodeCount).each do |i|
+    config.vm.define "worker#{i}" do |workernode|
+      workernode.vm.box = "centos/7"
+      workernode.vm.hostname = "worker#{i}.example.com"
+      workernode.vm.network "private_network", ip: "172.42.42.2#{i}"
+      workernode.vm.provision :shell, inline: "cat /vagrant/ssh-key.pub >> .ssh/authorized_keys"
+      workernode.vm.provision :shell, inline: "cat /vagrant/id_rsa.pub >> .ssh/authorized_keys"
+      workernode.vm.provision :shell, inline: "sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config"
+      workernode.vm.provision :shell, inline: "sudo systemctl restart sshd"
+      workernode.vm.provider "virtualbox" do |v|
+        v.name = "worker#{i}"
+        v.memory = 2048
+        v.cpus = 2
+        # Prevent VirtualBox from interfering with host audio stack
+        v.customize ["modifyvm", :id, "--audio", "none"]
+      end
+    end
+  end
+
+    config.vm.define "ansible-node" do |ansiblenode|
+      ansiblenode.vm.box = "centos/7"
+      ansiblenode.vm.hostname = "ansible-node.example.com"
+      ansiblenode.vm.network "private_network", ip: "172.42.42.60"
+      ansiblenode.vm.provision :shell, inline: "cat /vagrant/ssh-key.pub >> .ssh/authorized_keys"
+      ansiblenode.vm.provision :shell, inline: "cat /vagrant/id_rsa.pub >> .ssh/authorized_keys"
+      ansiblenode.vm.provision :shell, inline: "sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config"
+      ansiblenode.vm.provision :shell, inline: "sudo systemctl restart sshd"
+      ansiblenode.vm.provider "virtualbox" do |v|
+        v.name = "ansible-node"
+        v.memory = 2048
+        v.cpus = 2
+        # Prevent VirtualBox from interfering with host audio stack
+        v.customize ["modifyvm", :id, "--audio", "none"]
+      end
+    end
+
+end
+
+
+vagrant up and check all nodes and copy ansible node to all nodes
+vagrant up
+
+Bringing machine 'master1' up with 'virtualbox' provider...
+Bringing machine 'master2' up with 'virtualbox' provider...
+Bringing machine 'master3' up with 'virtualbox' provider...
+Bringing machine 'worker1' up with 'virtualbox' provider...
+Bringing machine 'worker2' up with 'virtualbox' provider...
+Bringing machine 'worker3' up with 'virtualbox' provider...
+Bringing machine 'ansible-node' up with 'virtualbox' provider...
+==> master1: Importing base box 'centos/7'...
+==> master1: Matching MAC address for NAT networking...
+==> master1: Checking if box 'centos/7' version '1905.1' is up to date...
+==> master1: Setting the name of the VM: master1
+==> master1: Clearing any previously set network interfaces...
+==> master1: Preparing network interfaces based on configuration...
+    master1: Adapter 1: nat
+    master1: Adapter 2: hostonly
+==> master1: Forwarding ports...
+    master1: 22 (guest) => 2222 (host) (adapter 1)
+==> master1: Running 'pre-boot' VM customizations...
+==> master1: Booting VM...
+==> master1: Waiting for machine to boot. This may take a few minutes...
+    master1: SSH address: 127.0.0.1:2222
+    master1: SSH username: vagrant
+    master1: SSH auth method: private key
+    master1:
+    master1: Vagrant insecure key detected. Vagrant will automatically replace
+    master1: this with a newly generated keypair for better security.
+    master1:
+    master1: Inserting generated public key within guest...
+    master1: Removing insecure key from the guest if it's present...
+    master1: Key inserted! Disconnecting and reconnecting using new SSH key...
+==> master1: Machine booted and ready!
+==> master1: Checking for guest additions in VM...
+    master1: No guest additions were detected on the base box for this VM! Guest
+    master1: additions are required for forwarded ports, shared folders, host only
+    master1: networking, and more. If SSH fails on this machine, please install
+    master1: the guest additions and repackage the box to continue.
+    master1:
+    master1: This is not an error message; everything may continue to work properly,
+    master1: in which case you may ignore this message.
+==> master1: Setting hostname...
+==> master1: Configuring and enabling network interfaces...
+==> master1: Rsyncing folder: /cygdrive/c/Users/p1328977/Desktop/kubespray/ => /vagrant
+==> master1: Running provisioner: shell...
+    master1: Running: inline script
+==> master1: Running provisioner: shell...
+    master1: Running: inline script
+==> master1: Running provisioner: shell...
+    master1: Running: inline script
+==> master1: Running provisioner: shell...
+    master1: Running: inline script
+==> master2: Importing base box 'centos/7'...
+==> master2: Matching MAC address for NAT networking...
+==> master2: Checking if box 'centos/7' version '1905.1' is up to date...
+==> master2: Setting the name of the VM: master2
+==> master2: Fixed port collision for 22 => 2222. Now on port 2200.
+==> master2: Clearing any previously set network interfaces...
+==> master2: Preparing network interfaces based on configuration...
+    master2: Adapter 1: nat
+    master2: Adapter 2: hostonly
+==> master2: Forwarding ports...
+    master2: 22 (guest) => 2200 (host) (adapter 1)
+==> master2: Running 'pre-boot' VM customizations...
+==> master2: Booting VM...
+==> master2: Waiting for machine to boot. This may take a few minutes...
+    master2: SSH address: 127.0.0.1:2200
+    master2: SSH username: vagrant
+    master2: SSH auth method: private key
+    master2:
+    master2: Vagrant insecure key detected. Vagrant will automatically replace
+    master2: this with a newly generated keypair for better security.
+    master2:
+    master2: Inserting generated public key within guest...
+    master2: Removing insecure key from the guest if it's present...
+    master2: Key inserted! Disconnecting and reconnecting using new SSH key...
+==> master2: Machine booted and ready!
+==> master2: Checking for guest additions in VM...
+    master2: No guest additions were detected on the base box for this VM! Guest
+    master2: additions are required for forwarded ports, shared folders, host only
+    master2: networking, and more. If SSH fails on this machine, please install
+    master2: the guest additions and repackage the box to continue.
+    master2:
+    master2: This is not an error message; everything may continue to work properly,
+    master2: in which case you may ignore this message.
+==> master2: Setting hostname...
+==> master2: Configuring and enabling network interfaces...
+==> master2: Rsyncing folder: /cygdrive/c/Users/p1328977/Desktop/kubespray/ => /vagrant
+==> master2: Running provisioner: shell...
+    master2: Running: inline script
+==> master2: Running provisioner: shell...
+    master2: Running: inline script
+==> master2: Running provisioner: shell...
+    master2: Running: inline script
+==> master2: Running provisioner: shell...
+    master2: Running: inline script
+==> master3: Importing base box 'centos/7'...
+==> master3: Matching MAC address for NAT networking...
+==> master3: Checking if box 'centos/7' version '1905.1' is up to date...
+==> master3: Setting the name of the VM: master3
+==> master3: Fixed port collision for 22 => 2222. Now on port 2205.
+==> master3: Clearing any previously set network interfaces...
+==> master3: Preparing network interfaces based on configuration...
+    master3: Adapter 1: nat
+    master3: Adapter 2: hostonly
+==> master3: Forwarding ports...
+    master3: 22 (guest) => 2205 (host) (adapter 1)
+==> master3: Running 'pre-boot' VM customizations...
+==> master3: Booting VM...
+==> master3: Waiting for machine to boot. This may take a few minutes...
+    master3: SSH address: 127.0.0.1:2205
+    master3: SSH username: vagrant
+    master3: SSH auth method: private key
+    master3:
+    master3: Vagrant insecure key detected. Vagrant will automatically replace
+    master3: this with a newly generated keypair for better security.
+    master3:
+    master3: Inserting generated public key within guest...
+    master3: Removing insecure key from the guest if it's present...
+    master3: Key inserted! Disconnecting and reconnecting using new SSH key...
+==> master3: Machine booted and ready!
+==> master3: Checking for guest additions in VM...
+    master3: No guest additions were detected on the base box for this VM! Guest
+    master3: additions are required for forwarded ports, shared folders, host only
+    master3: networking, and more. If SSH fails on this machine, please install
+    master3: the guest additions and repackage the box to continue.
+    master3:
+    master3: This is not an error message; everything may continue to work properly,
+    master3: in which case you may ignore this message.
+==> master3: Setting hostname...
+==> master3: Configuring and enabling network interfaces...
+==> master3: Rsyncing folder: /cygdrive/c/Users/p1328977/Desktop/kubespray/ => /vagrant
+==> master3: Running provisioner: shell...
+    master3: Running: inline script
+==> master3: Running provisioner: shell...
+    master3: Running: inline script
+==> master3: Running provisioner: shell...
+    master3: Running: inline script
+==> master3: Running provisioner: shell...
+    master3: Running: inline script
+==> worker1: Importing base box 'centos/7'...
+==> worker1: Matching MAC address for NAT networking...
+==> worker1: Checking if box 'centos/7' version '1905.1' is up to date...
+==> worker1: Setting the name of the VM: worker1
+==> worker1: Fixed port collision for 22 => 2222. Now on port 2201.
+==> worker1: Clearing any previously set network interfaces...
+==> worker1: Preparing network interfaces based on configuration...
+    worker1: Adapter 1: nat
+    worker1: Adapter 2: hostonly
+==> worker1: Forwarding ports...
+    worker1: 22 (guest) => 2201 (host) (adapter 1)
+==> worker1: Running 'pre-boot' VM customizations...
+==> worker1: Booting VM...
+==> worker1: Waiting for machine to boot. This may take a few minutes...
+    worker1: SSH address: 127.0.0.1:2201
+    worker1: SSH username: vagrant
+    worker1: SSH auth method: private key
+    worker1:
+    worker1: Vagrant insecure key detected. Vagrant will automatically replace
+    worker1: this with a newly generated keypair for better security.
+    worker1:
+    worker1: Inserting generated public key within guest...
+    worker1: Removing insecure key from the guest if it's present...
+    worker1: Key inserted! Disconnecting and reconnecting using new SSH key...
+==> worker1: Machine booted and ready!
+==> worker1: Checking for guest additions in VM...
+    worker1: No guest additions were detected on the base box for this VM! Guest
+    worker1: additions are required for forwarded ports, shared folders, host only
+    worker1: networking, and more. If SSH fails on this machine, please install
+    worker1: the guest additions and repackage the box to continue.
+    worker1:
+    worker1: This is not an error message; everything may continue to work properly,
+    worker1: in which case you may ignore this message.
+==> worker1: Setting hostname...
+==> worker1: Configuring and enabling network interfaces...
+==> worker1: Rsyncing folder: /cygdrive/c/Users/p1328977/Desktop/kubespray/ => /vagrant
+==> worker1: Running provisioner: shell...
+    worker1: Running: inline script
+==> worker1: Running provisioner: shell...
+    worker1: Running: inline script
+==> worker1: Running provisioner: shell...
+    worker1: Running: inline script
+==> worker1: Running provisioner: shell...
+    worker1: Running: inline script
+==> worker2: Importing base box 'centos/7'...
+==> worker2: Matching MAC address for NAT networking...
+==> worker2: Checking if box 'centos/7' version '1905.1' is up to date...
+==> worker2: Setting the name of the VM: worker2
+==> worker2: Fixed port collision for 22 => 2222. Now on port 2202.
+==> worker2: Clearing any previously set network interfaces...
+==> worker2: Preparing network interfaces based on configuration...
+    worker2: Adapter 1: nat
+    worker2: Adapter 2: hostonly
+==> worker2: Forwarding ports...
+    worker2: 22 (guest) => 2202 (host) (adapter 1)
+==> worker2: Running 'pre-boot' VM customizations...
+==> worker2: Booting VM...
+==> worker2: Waiting for machine to boot. This may take a few minutes...
+    worker2: SSH address: 127.0.0.1:2202
+    worker2: SSH username: vagrant
+    worker2: SSH auth method: private key
+    worker2:
+    worker2: Vagrant insecure key detected. Vagrant will automatically replace
+    worker2: this with a newly generated keypair for better security.
+    worker2:
+    worker2: Inserting generated public key within guest...
+    worker2: Removing insecure key from the guest if it's present...
+    worker2: Key inserted! Disconnecting and reconnecting using new SSH key...
+==> worker2: Machine booted and ready!
+==> worker2: Checking for guest additions in VM...
+    worker2: No guest additions were detected on the base box for this VM! Guest
+    worker2: additions are required for forwarded ports, shared folders, host only
+    worker2: networking, and more. If SSH fails on this machine, please install
+    worker2: the guest additions and repackage the box to continue.
+    worker2:
+    worker2: This is not an error message; everything may continue to work properly,
+    worker2: in which case you may ignore this message.
+==> worker2: Setting hostname...
+==> worker2: Configuring and enabling network interfaces...
+==> worker2: Rsyncing folder: /cygdrive/c/Users/p1328977/Desktop/kubespray/ => /vagrant
+==> worker2: Running provisioner: shell...
+    worker2: Running: inline script
+==> worker2: Running provisioner: shell...
+    worker2: Running: inline script
+==> worker2: Running provisioner: shell...
+    worker2: Running: inline script
+==> worker2: Running provisioner: shell...
+    worker2: Running: inline script
+==> worker3: Importing base box 'centos/7'...
+==> worker3: Matching MAC address for NAT networking...
+==> worker3: Checking if box 'centos/7' version '1905.1' is up to date...
+==> worker3: Setting the name of the VM: worker3
+==> worker3: Fixed port collision for 22 => 2222. Now on port 2203.
+==> worker3: Clearing any previously set network interfaces...
+==> worker3: Preparing network interfaces based on configuration...
+    worker3: Adapter 1: nat
+    worker3: Adapter 2: hostonly
+==> worker3: Forwarding ports...
+    worker3: 22 (guest) => 2203 (host) (adapter 1)
+==> worker3: Running 'pre-boot' VM customizations...
+==> worker3: Booting VM...
+==> worker3: Waiting for machine to boot. This may take a few minutes...
+    worker3: SSH address: 127.0.0.1:2203
+    worker3: SSH username: vagrant
+    worker3: SSH auth method: private key
+    worker3:
+    worker3: Vagrant insecure key detected. Vagrant will automatically replace
+    worker3: this with a newly generated keypair for better security.
+    worker3:
+    worker3: Inserting generated public key within guest...
+    worker3: Removing insecure key from the guest if it's present...
+    worker3: Key inserted! Disconnecting and reconnecting using new SSH key...
+==> worker3: Machine booted and ready!
+==> worker3: Checking for guest additions in VM...
+    worker3: No guest additions were detected on the base box for this VM! Guest
+    worker3: additions are required for forwarded ports, shared folders, host only
+    worker3: networking, and more. If SSH fails on this machine, please install
+    worker3: the guest additions and repackage the box to continue.
+    worker3:
+    worker3: This is not an error message; everything may continue to work properly,
+    worker3: in which case you may ignore this message.
+==> worker3: Setting hostname...
+==> worker3: Configuring and enabling network interfaces...
+==> worker3: Rsyncing folder: /cygdrive/c/Users/p1328977/Desktop/kubespray/ => /vagrant
+==> worker3: Running provisioner: shell...
+    worker3: Running: inline script
+==> worker3: Running provisioner: shell...
+    worker3: Running: inline script
+==> worker3: Running provisioner: shell...
+    worker3: Running: inline script
+==> worker3: Running provisioner: shell...
+    worker3: Running: inline script
+==> ansible-node: Importing base box 'centos/7'...
+==> ansible-node: Matching MAC address for NAT networking...
+==> ansible-node: Checking if box 'centos/7' version '1905.1' is up to date...
+==> ansible-node: Setting the name of the VM: ansible-node
+==> ansible-node: Fixed port collision for 22 => 2222. Now on port 2204.
+==> ansible-node: Clearing any previously set network interfaces...
+==> ansible-node: Preparing network interfaces based on configuration...
+    ansible-node: Adapter 1: nat
+    ansible-node: Adapter 2: hostonly
+==> ansible-node: Forwarding ports...
+    ansible-node: 22 (guest) => 2204 (host) (adapter 1)
+==> ansible-node: Running 'pre-boot' VM customizations...
+==> ansible-node: Booting VM...
+==> ansible-node: Waiting for machine to boot. This may take a few minutes...
+    ansible-node: SSH address: 127.0.0.1:2204
+    ansible-node: SSH username: vagrant
+    ansible-node: SSH auth method: private key
+    ansible-node:
+    ansible-node: Vagrant insecure key detected. Vagrant will automatically replace
+    ansible-node: this with a newly generated keypair for better security.
+    ansible-node:
+    ansible-node: Inserting generated public key within guest...
+    ansible-node: Removing insecure key from the guest if it's present...
+    ansible-node: Key inserted! Disconnecting and reconnecting using new SSH key...
+==> ansible-node: Machine booted and ready!
+==> ansible-node: Checking for guest additions in VM...
+    ansible-node: No guest additions were detected on the base box for this VM! Guest
+    ansible-node: additions are required for forwarded ports, shared folders, host only
+    ansible-node: networking, and more. If SSH fails on this machine, please install
+    ansible-node: the guest additions and repackage the box to continue.
+    ansible-node:
+    ansible-node: This is not an error message; everything may continue to work properly,
+    ansible-node: in which case you may ignore this message.
+==> ansible-node: Setting hostname...
+==> ansible-node: Configuring and enabling network interfaces...
+==> ansible-node: Rsyncing folder: /cygdrive/c/Users/p1328977/Desktop/kubespray/ => /vagrant
+==> ansible-node: Running provisioner: shell...
+    ansible-node: Running: inline script
+==> ansible-node: Running provisioner: shell...
+    ansible-node: Running: inline script
+==> ansible-node: Running provisioner: shell...
+    ansible-node: Running: inline script
+==> ansible-node: Running provisioner: shell...
+    ansible-node: Running: inline script
+
+P1328977@NCS-140420MZ02 MINGW64 ~/Desktop/kubespray (master)
+
+Run below command in all Nodes
+==============================
+
+sudo yum install epel-release -y 
+sudo yum install yum-plugin-fastestmirror -y
+sudo doc
+
+sudo setenforce 0
+sudo sed -i --follow-symlinks 's/SELINUX=enforcing/SELINUX=permissive/g' /etc/sysconfig/selinux
+sudo swapoff -a
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+
+sudo cat <<-'EOF' >/etc/sysctl.conf
+net.ipv4.ip_forward=1
+net.ipv4.ip_local_reserved_ports=30000-32767
+net.bridge.bridge-nf-call-iptables=1
+net.bridge.bridge-nf-call-arptables=1
+net.bridge.bridge-nf-call-ip6tables=1
+EOF
+
+sudo sysctl -p /etc/sysctl.conf
+
+
+Ansible Installation Process in Ansible Node
+=============================================
+
+yum -y install python-pip
+
+    or
+	
+curl "https://bootstrap.pypa.io/get-pip.py" -o "get-pip.py"
+
+python get-pip.py
+
+pip --help
+
+yum install ansible
+
+pip install jinja2 --upgrade
+
+
+# Install HA proxy in Ansible-Node
+==================================
+
+sudo yum install haproxy
+
+sudo vi /etc/haproxy/haproxy.cfg
+
+#####after default section add this below
+
+listen kubernetes-apiserver-https
+  bind 172.42.42.60:8383
+  mode tcp
+  option log-health-checks
+  timeout client 3h
+  timeout server 3h
+  server master1 172.42.42.11:6443 check check-ssl verify none inter 10000
+  server master2 172.42.42.12:6443 check check-ssl verify none inter 10000
+  server master2 172.42.42.13:6443 check check-ssl verify none inter 10000
+  balance roundrobin
+
+:wq!
+
+# sudo systemctl enable haproxy
+# sudo systemctl start haproxy
+# sudo systemctl status haproxy
+
+[root@ansible-node kubespray]# sudo systemctl status haproxy
+● haproxy.service - HAProxy Load Balancer
+   Loaded: loaded (/usr/lib/systemd/system/haproxy.service; enabled; vendor preset: disabled)
+   Active: active (running) since Mon 2020-04-20 17:29:21 +08; 1h 2min ago
+ Main PID: 767 (haproxy-systemd)
+   CGroup: /system.slice/haproxy.service
+           ├─767 /usr/sbin/haproxy-systemd-wrapper -f /etc/haproxy/haproxy.cfg -p /run/haproxy.pid
+           ├─773 /usr/sbin/haproxy -f /etc/haproxy/haproxy.cfg -p /run/haproxy.pid -Ds
+           └─777 /usr/sbin/haproxy -f /etc/haproxy/haproxy.cfg -p /run/haproxy.pid -Ds
+
+Apr 20 17:29:21 ansible-node.example.com systemd[1]: Started HAProxy Load Balancer.
+Apr 20 17:29:21 ansible-node.example.com haproxy-systemd-wrapper[767]: haproxy-systemd-wrapper: executing /usr/sbin/haproxy -f /etc/haproxy/haproxy.cfg -p /run/haproxy.pid -Ds
+Apr 20 17:29:21 ansible-node.example.com haproxy-systemd-wrapper[767]: [WARNING] 110/172921 (773) : parsing [/etc/haproxy/haproxy.cfg:45] : 'option httplog' not usable with proxy 'kubernetes-ap...on tcplog'.
+Apr 20 17:29:21 ansible-node.example.com haproxy-systemd-wrapper[767]: [WARNING] 110/172921 (773) : parsing [/etc/haproxy/haproxy.cfg:68] : proxy 'kubernetes-apiserver-https', another server na...ecommended.
+Apr 20 17:29:21 ansible-node.example.com haproxy-systemd-wrapper[767]: [WARNING] 110/172921 (773) : config : 'option forwardfor' ignored for proxy 'kubernetes-apiserver-https' as it requires HTTP mode.
+Hint: Some lines were ellipsized, use -l to show in full.
+
+
+
+# netstat -tlnp
+
+[root@ansible-node kubespray]# netstat -tlnp|grep 8383
+tcp        0      0 172.42.42.60:8383       0.0.0.0:*               LISTEN      777/haproxy
+[root@ansible-node kubespray]#
+
+#Install Docker Registry and download all required images and push to local docker registry
+============================================================================================
+
+1.Install docker in ansible node
+
+sudo yum-config-manager \
+    --add-repo \
+    https://download.docker.com/linux/centos/docker-ce.repo
+	
+sudo yum install docker-ce docker-ce-cli containerd.io
+
+or
+
+You can choose any docker version and install it
+
+$ yum list docker-ce --showduplicates | sort -r
+
+docker-ce.x86_64  3:18.09.1-3.el7                     docker-ce-stable
+docker-ce.x86_64  3:18.09.0-3.el7                     docker-ce-stable
+docker-ce.x86_64  18.06.1.ce-3.el7                    docker-ce-stable
+docker-ce.x86_64  18.06.0.ce-3.el7                    docker-ce-stable
+
+$ sudo yum install docker-ce-18.06.1.ce-3.el7 docker-ce-cli-18.06.1.ce-3.el7 containerd.io
+
+systemctl daemon-reload
+systemctl restart docker
+systemctl enable docker
+systemctl status docker
+
+2.Install docker registry
+
+docker run -d -p 5000:5000 --restart=always --name registry registry:2
+
+[root@ansible-node inventory]# docker ps -a
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                    NAMES
+40ead8aa9130        registry:2          "/entrypoint.sh /etc…"   26 hours ago        Up 4 hours          0.0.0.0:5000->5000/tcp   registry
+[root@ansible-node inventory]#
+
+4.Download all the images and push to local docker registry 
+
+
+[root@master1 yum.repos.d]# docker images
+REPOSITORY                                                       TAG                 IMAGE ID            CREATED             SIZE
+172.42.42.60:5000/kube-proxy                                     v1.17.5             e13db435247d        7 days ago          116MB
+172.42.42.60:5000/kube-apiserver                                 v1.17.5             f640481f6db3        7 days ago          171MB
+172.42.42.60:5000/kube-controller-manager                        v1.17.5             fe3d691efbf3        7 days ago          161MB
+172.42.42.60:5000/kube-scheduler                                 v1.17.5             f648efaff966        7 days ago          94.4MB
+172.42.42.60:5000/calico/cni                                     v3.13.2             a89faaa1676a        3 weeks ago         224MB
+172.42.42.60:5000/calico/kube-controllers                        v3.13.2             0c3bf0adad2b        3 weeks ago         56.6MB
+172.42.42.60:5000/calico/node                                    v3.13.2             6f674c890b23        3 weeks ago         260MB
+172.42.42.60:5000/coredns/coredns                                1.6.9               faac9e62c0d6        4 weeks ago         43.2MB
+172.42.42.60:5000/k8s-dns-node-cache                             1.15.10             bf7fb748e527        7 weeks ago         93.1MB
+172.42.42.60:5000/cluster-proportional-autoscaler-amd64          1.7.1               14afc47fd5af        8 months ago        40.1MB
+172.42.42.60:5000/coreos/etcd                                    v3.3.12             28c771d7cfbf        14 months ago       40.6MB
+172.42.42.60:5000/google_containers/kubernetes-dashboard-amd64   v1.10.1             f9aed6605b81        16 months ago       122MB
+172.42.42.60:5000/pause                                          3.1                 da86e6ba6ca1        2 years ago         742kB
+
+
+5. List all the images for docker registry
+
+yum install jq -y
+
+for repository in $(curl -s http://172.42.42.60:5000/v2/_catalog | jq -r '.repositories[]'); do
+  curl -s http://172.42.42.60:5000/v2/${repository}/tags/list | jq -r '(.name + ":" + .tags[])'
+done
+
+calico/cni:v3.13.2
+calico/kube-controllers:v3.13.2
+calico/node:v3.13.2
+cluster-proportional-autoscaler-amd64:1.7.1
+coredns/coredns:1.6.9
+coreos/etcd:v3.3.12
+google_containers/kubernetes-dashboard-amd64:v1.10.1
+k8s-dns-node-cache:1.15.10
+kube-apiserver:v1.17.5
+kube-controller-manager:v1.17.5
+kube-proxy:v1.17.5
+kube-scheduler:v1.17.5
+pause:3.1
+
+
+
+Clone the kubespray repository
+==============================
+
+git clone https://github.com/kubernetes-sigs/kubespray.git
+cd kubespray
+
+# Install dependencies from ``requirements.txt``
+sudo pip3 install -r requirements.txt
+
+# Copy ``inventory/sample`` as ``inventory/mycluster``
+cp -rfp inventory/sample inventory/mycluster
+
+# Update Ansible inventory file with inventory builder
+declare -a IPS=(172.42.42.11 172.42.42.12 172.42.42.13 172.42.42.21 172.42.42.22 172.42.42.23)
+CONFIG_FILE=inventory/mycluster/hosts.yaml python3 contrib/inventory_builder/inventory.py ${IPS[@]}
+
+
+Configuration Changes to install as offline Kubernetes Cluster Installation
+===========================================================================
+
+1. Update the HA Proxy details
+
+vi inventory/mycluster/group_vars/all/all.yml
+
+
+## External LB example config
+apiserver_loadbalancer_domain_name: "kube-lb.example.com"
+loadbalancer_apiserver:
+  address: 172.42.42.60
+  port: 8383
+
+
+## Internal loadbalancers for apiservers
+loadbalancer_apiserver_localhost: false
+# valid options are "nginx" or "haproxy"
+# loadbalancer_apiserver_type: nginx # valid values "nginx" or "haproxy"
+
+:wq!
+
+2. Update docker_insecure_registries in  inventory/mycluster/group_vars/all/docker.yml file
+
+vi inventory/mycluster/group_vars/all/docker.yml
+
+docker_insecure_registries:
+    - 172.42.42.60:5000
+docker_insecure_registries:
+#   - mirror.registry.io
+    - 172.42.42.60:5000
+
+3. Update Kubernetes Image Repo 
+
+vi inventory/mycluster/group_vars/k8s-cluster/k8s-cluster.yml
+
+# kubernetes image repo define
+kube_image_repo: "172.42.42.60:5000"
+
+4. Update all other Image Repo URL and all download repo URL
+
+vi roles/download/defaults/main.yml
+
+
+# gcr and kubernetes image repo define
+gcr_image_repo: "172.42.42.60:5000"
+#kube image repo define
+kube_image_repo: "172.42.42.60:5000"
+# docker image repo define
+docker_image_repo: "172.42.42.60:5000"
+# quay image repo define
+quay_image_repo: "172.42.42.60:5000"
+
+
+
+# Download URLs
+
+#kubelet_download_url: "https://storage.googleapis.com/kubernetes-release/release/{{ kube_version }}/bin/linux/{{ image_arch }}/kubelet"
+kubelet_download_url: http://172.42.42.60/k8sbinary/kubelet
+
+#kubectl_download_url: "https://storage.googleapis.com/kubernetes-release/release/{{ kube_version }}/bin/linux/{{ image_arch }}/kubectl"
+kubectl_download_url: http://172.42.42.60/k8sbinary/kubectl
+
+#kubeadm_download_url: "https://storage.googleapis.com/kubernetes-release/release/{{ kubeadm_version }}/bin/linux/{{ image_arch }}/kubeadm"
+kubeadm_download_url: http://172.42.42.60/k8sbinary/kubeadm
+
+#etcd_download_url: "https://github.com/coreos/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{ image_arch }}.tar.gz"
+etcd_download_url: http://172.42.42.60/k8sbinary/etcd-v3.3.12-linux-amd64.tar.gz
+
+#cni_download_url: "https://github.com/containernetworking/plugins/releases/download/{{ cni_version }}/cni-plugins-linux-{{ image_arch }}-{{ cni_version }}.tgz"
+cni_download_url: http://172.42.42.60/k8sbinary/cni-plugins-linux-amd64-v0.8.5.tgz
+
+#calicoctl_download_url: "https://github.com/projectcalico/calicoctl/releases/download/{{ calico_ctl_version }}/calicoctl-linux-{{ image_arch }}"
+calicoctl_download_url: http://172.42.42.60/k8sbinary/calicoctl-linux-amd64
+
+#
+crictl_download_url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictl_version }}/crictl-{{ crictl_version }}-{{ ansible_system | lower }}-{{ image_arch }}.tar.gz"
+crictl_download_url: "http://172.42.42.60/k8sbinary/crictl-v1.17.0-linux-amd64.tar.gz"
+
+:wq
+
+
+5. Update docker_rh_repo_base_url URL and extras_rh_repo URL
+
+
+vi roles/container-engine/docker/defaults/main.yml
+
+# CentOS/RedHat docker-ce repo
+#docker_rh_repo_base_url: 'https://download.docker.com/linux/centos/7/$basearch/stable'
+docker_rh_repo_base_url: 'http://172.42.42.60/linux/centos/7/$basearch/stable'
+#docker_rh_repo_gpgkey: 'https://download.docker.com/linux/centos/gpg'
+docker_rh_repo_gpgkey: 'http://172.42.42.60/linux/centos/gpg'
+
+# CentOS/RedHat Extras repo
+extras_rh_repo_base_url: 'http://172.42.42.60/centos/7/extras/x86_64'
+extras_rh_repo_gpgkey: 'http://172.42.42.60/linux/centos/gpg'
+
+
+6. Update Host file for setup
+
+vi inventory/mycluster/hosts.yaml 
+
+all:
+  hosts:
+    master1:
+      ansible_host: 172.42.42.11
+      ip: 172.42.42.11
+      access_ip: 172.42.42.11
+    master2:
+      ansible_host: 172.42.42.12
+      ip: 172.42.42.12
+      access_ip: 172.42.42.12
+    master3:
+      ansible_host: 172.42.42.13
+      ip: 172.42.42.13
+      access_ip: 172.42.42.13
+    worker1:
+      ansible_host: 172.42.42.21
+      ip: 172.42.42.21
+      access_ip: 172.42.42.21
+    worker2:
+      ansible_host: 172.42.42.22
+      ip: 172.42.42.22
+      access_ip: 172.42.42.22
+    worker3:
+      ansible_host: 172.42.42.23
+      ip: 172.42.42.23
+      access_ip: 172.42.42.23
+  children:
+    kube-master:
+      hosts:
+        master1:
+        master2:
+        master3:
+    kube-node:
+      hosts:
+        worker1:
+        worker2:
+        worker3:
+    etcd:
+      hosts:
+        master1:
+        master2:
+        master3:
+    k8s-cluster:
+      children:
+        kube-master:
+        kube-node:
+    calico-rr:
+      hosts: {}
+
+
+validate the yaml file if fail
+==============================
+
+--- 
+all: 
+  children: 
+    calico-rr: 
+      hosts: {}
+    etcd: 
+      hosts: 
+        master1: ~
+        master2: ~
+        master3: ~
+    k8s-cluster: 
+      children: 
+        kube-master: ~
+        kube-node: ~
+    kube-master: 
+      hosts: 
+        master1: ~
+        master2: ~
+        master3: ~
+    kube-node: 
+      hosts: 
+        worker1: ~
+        worker2: ~
+        worker3: ~
+  hosts: 
+    master1: 
+      access_ip: "172.42.42.11"
+      ansible_host: "172.42.42.11"
+      ip: "172.42.42.11"
+    master2: 
+      access_ip: "172.42.42.12"
+      ansible_host: "172.42.42.12"
+      ip: "172.42.42.12"
+    master3: 
+      access_ip: "172.42.42.13"
+      ansible_host: "172.42.42.13"
+      ip: "172.42.42.13"
+    worker1: 
+      access_ip: "172.42.42.21"
+      ansible_host: "172.42.42.21"
+      ip: "172.42.42.21"
+    worker2: 
+      access_ip: "172.42.42.22"
+      ansible_host: "172.42.42.22"
+      ip: "172.42.42.22"
+    worker3: 
+      access_ip: "172.42.42.23"
+      ansible_host: "172.42.42.23"
+      ip: "172.42.42.23"
+
+:wq
+
+Update the ansible host file
+===============================
+
+cp -p /etc/ansible/hosts /etc/ansible/hosts-bkup
+cp -p inventory/mycluster/hosts.yaml /etc/ansible/hosts
+
+ansible all -m ping
+ansible all -m shell -a 'date'
+
+
+
+
+# Deploy Kubespray with Ansible Playbook - run the playbook as root
+# The option `--become` is required, as for example writing SSL keys in /etc/,
+# installing packages and interacting with various systemd daemons.
+# Without --become the playbook will fail to run!
+Now start Kubespray Cluster Installation:
+=========================================================================================
+
+ansible-playbook -i inventory/mycluster/hosts.yaml  --become --become-user=root cluster.yml
+
+................
+
+PLAY RECAP ****************************************************************************************************************************************************************************************************
+localhost                  : ok=1    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+master1                    : ok=512  changed=18   unreachable=0    failed=0    skipped=1019 rescued=0    ignored=0
+master2                    : ok=444  changed=19   unreachable=0    failed=0    skipped=882  rescued=0    ignored=0
+master3                    : ok=442  changed=19   unreachable=0    failed=0    skipped=884  rescued=0    ignored=0
+worker1                    : ok=316  changed=12   unreachable=0    failed=0    skipped=545  rescued=0    ignored=0
+worker2                    : ok=316  changed=12   unreachable=0    failed=0    skipped=545  rescued=0    ignored=0
+worker3                    : ok=316  changed=12   unreachable=0    failed=0    skipped=545  rescued=0    ignored=0
+
+
+
+Installing kubectl in ansible-node
+==================================
+Add this repo if the ansible node or client machine has internet connection
+
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+
+Run the below command to install kubectl 
+
+yum install -y kubectl
+
+mkdir ~/.kube
+vi ~/.kube/config
+
+copy below file content from any of the master node /etc/kubernetes/admin.conf
+
+and save it
+
+[root@ansible-node kubespray]# kubectl get nodes -o wide
+
+NAME      STATUS   ROLES    AGE   VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE                KERNEL-VERSION                CONTAINER-RUNTIME
+master1   Ready    master   41m   v1.17.5   172.42.42.11   <none>        CentOS Linux 7 (Core)   3.10.0-1062.18.1.el7.x86_64   docker://18.9.9
+master2   Ready    master   40m   v1.17.5   172.42.42.12   <none>        CentOS Linux 7 (Core)   3.10.0-1062.18.1.el7.x86_64   docker://18.9.9
+master3   Ready    master   40m   v1.17.5   172.42.42.13   <none>        CentOS Linux 7 (Core)   3.10.0-1062.18.1.el7.x86_64   docker://18.9.9
+worker1   Ready    <none>   39m   v1.17.5   172.42.42.21   <none>        CentOS Linux 7 (Core)   3.10.0-1062.18.1.el7.x86_64   docker://18.9.9
+worker2   Ready    <none>   39m   v1.17.5   172.42.42.22   <none>        CentOS Linux 7 (Core)   3.10.0-1062.18.1.el7.x86_64   docker://18.9.9
+worker3   Ready    <none>   39m   v1.17.5   172.42.42.23   <none>        CentOS Linux 7 (Core)   3.10.0-1062.18.1.el7.x86_64   docker://18.9.9
+
+
+[root@ansible-node kubespray]# kubectl get all --all-namespaces
+NAMESPACE     NAME                                           READY   STATUS    RESTARTS   AGE
+kube-system   pod/calico-kube-controllers-7c55d99c87-5nktc   1/1     Running   0          39m
+kube-system   pod/calico-node-2vj57                          1/1     Running   1          40m
+kube-system   pod/calico-node-bwgc4                          1/1     Running   1          40m
+kube-system   pod/calico-node-fcjnx                          1/1     Running   1          40m
+kube-system   pod/calico-node-k78j8                          1/1     Running   1          40m
+kube-system   pod/calico-node-tl5fh                          1/1     Running   1          40m
+kube-system   pod/calico-node-x98kk                          1/1     Running   1          40m
+kube-system   pod/coredns-846c8b5488-4z5xk                   1/1     Running   0          5m39s
+kube-system   pod/coredns-846c8b5488-q4k74                   1/1     Running   0          5m44s
+kube-system   pod/dns-autoscaler-85f898cd5c-wwwkl            1/1     Running   0          38m
+kube-system   pod/kube-apiserver-master1                     1/1     Running   0          43m
+kube-system   pod/kube-apiserver-master2                     1/1     Running   0          42m
+kube-system   pod/kube-apiserver-master3                     1/1     Running   0          42m
+kube-system   pod/kube-controller-manager-master1            1/1     Running   0          43m
+kube-system   pod/kube-controller-manager-master2            1/1     Running   0          42m
+kube-system   pod/kube-controller-manager-master3            1/1     Running   0          42m
+kube-system   pod/kube-proxy-6nkhh                           1/1     Running   0          39m
+kube-system   pod/kube-proxy-6vm45                           1/1     Running   0          39m
+kube-system   pod/kube-proxy-cb7zl                           1/1     Running   0          39m
+kube-system   pod/kube-proxy-f66vg                           1/1     Running   0          39m
+kube-system   pod/kube-proxy-f88cw                           1/1     Running   0          39m
+kube-system   pod/kube-proxy-sch2s                           1/1     Running   0          39m
+kube-system   pod/kube-scheduler-master1                     1/1     Running   0          43m
+kube-system   pod/kube-scheduler-master2                     1/1     Running   0          42m
+kube-system   pod/kube-scheduler-master3                     1/1     Running   0          42m
+kube-system   pod/kubernetes-dashboard-556b9ff8f8-hkgbc      1/1     Running   0          38m
+kube-system   pod/nodelocaldns-6xqtm                         1/1     Running   0          38m
+kube-system   pod/nodelocaldns-mcxbf                         1/1     Running   0          38m
+kube-system   pod/nodelocaldns-ndcqd                         1/1     Running   0          38m
+kube-system   pod/nodelocaldns-s62kl                         1/1     Running   0          38m
+kube-system   pod/nodelocaldns-x2dcx                         1/1     Running   0          38m
+kube-system   pod/nodelocaldns-zrbs5                         1/1     Running   0          38m
+
+NAMESPACE     NAME                           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)                  AGE
+default       service/kubernetes             ClusterIP   10.233.0.1      <none>        443/TCP                  43m
+kube-system   service/coredns                ClusterIP   10.233.0.3      <none>        53/UDP,53/TCP,9153/TCP   38m
+kube-system   service/kubernetes-dashboard   ClusterIP   10.233.14.201   <none>        443/TCP                  38m
+
+NAMESPACE     NAME                          DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR                                        AGE
+kube-system   daemonset.apps/calico-node    6         6         6       6            6           <none>                                               40m
+kube-system   daemonset.apps/kube-proxy     6         6         6       6            6           beta.kubernetes.io/os=linux,kubernetes.io/os=linux   43m
+kube-system   daemonset.apps/nodelocaldns   6         6         6       6            6           <none>                                               38m
+
+NAMESPACE     NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE
+kube-system   deployment.apps/calico-kube-controllers   1/1     1            1           39m
+kube-system   deployment.apps/coredns                   2/2     2            2           5m44s
+kube-system   deployment.apps/dns-autoscaler            1/1     1            1           38m
+kube-system   deployment.apps/kubernetes-dashboard      1/1     1            1           38m
+
+NAMESPACE     NAME                                                 DESIRED   CURRENT   READY   AGE
+kube-system   replicaset.apps/calico-kube-controllers-7c55d99c87   1         1         1       39m
+kube-system   replicaset.apps/coredns-846c8b5488                   2         2         2       5m44s
+kube-system   replicaset.apps/dns-autoscaler-85f898cd5c            1         1         1       38m
+kube-system   replicaset.apps/kubernetes-dashboard-556b9ff8f8      1         1         1       38m
+
+
+Validate ETCD Cluster Health:
+=============================
+
+[root@master1 bin]# ps -ef|grep etcd|grep -v grep|grep api
+root      6171  6120  5 17:53 ?        00:09:48 kube-apiserver --advertise-address=172.42.42.11 --allow-privileged=true --anonymous-auth=True --apiserver-count=3 --authorization-mode=Node,RBAC --bind-address=0.0.0.0 --client-ca-file=/etc/kubernetes/ssl/ca.crt --enable-admission-plugins=NodeRestriction --enable-aggregator-routing=False --enable-bootstrap-token-auth=true --endpoint-reconciler-type=lease --etcd-cafile=/etc/ssl/etcd/ssl/ca.pem --etcd-certfile=/etc/ssl/etcd/ssl/node-master1.pem --etcd-keyfile=/etc/ssl/etcd/ssl/node-master1-key.pem --etcd-servers=https://172.42.42.11:2379,https://172.42.42.13:2379,https://172.42.42.12:2379 --insecure-port=0 --kubelet-client-certificate=/etc/kubernetes/ssl/apiserver-kubelet-client.crt --kubelet-client-key=/etc/kubernetes/ssl/apiserver-kubelet-client.key --kubelet-preferred-address-types=InternalDNS,InternalIP,Hostname,ExternalDNS,ExternalIP --profiling=False --proxy-client-cert-file=/etc/kubernetes/ssl/front-proxy-client.crt --proxy-client-key-file=/etc/kubernetes/ssl/front-proxy-client.key --request-timeout=1m0s --requestheader-allowed-names=front-proxy-client --requestheader-client-ca-file=/etc/kubernetes/ssl/front-proxy-ca.crt --requestheader-extra-headers-prefix=X-Remote-Extra- --requestheader-group-headers=X-Remote-Group --requestheader-username-headers=X-Remote-User --runtime-config= --secure-port=6443 --service-account-key-file=/etc/kubernetes/ssl/sa.pub --service-cluster-ip-range=10.233.0.0/18 --service-node-port-range=30000-32767 --storage-backend=etcd3 --tls-cert-file=/etc/kubernetes/ssl/apiserver.crt --tls-private-key-file=/etc/kubernetes/ssl/apiserver.key
+[root@master1 bin]#
+
+
+[root@master1 bin]# ETCDCTL_API=3
+
+[root@master1 bin]# etcdctl --endpoints https://172.42.42.13:2379 --ca-file="/etc/ssl/etcd/ssl/ca.pem" --cert-file="/etc/ssl/etcd/ssl/node-master1.pem" --key-file="/etc/ssl/etcd/ssl/node-master1-key.pem" --version
+etcdctl version: 3.3.9
+API version: 2
+
+
+[root@master1 bin]# etcdctl --endpoints https://172.42.42.13:2379 --ca-file="/etc/ssl/etcd/ssl/ca.pem" --cert-file="/etc/ssl/etcd/ssl/node-master1.pem" --key-file="/etc/ssl/etcd/ssl/node-master1-key.pem" member list
+4f62cd245d00f5f: name=etcd3 peerURLs=https://172.42.42.12:2380 clientURLs=https://172.42.42.12:2379 isLeader=true
+9fb7391c7feee94b: name=etcd2 peerURLs=https://172.42.42.13:2380 clientURLs=https://172.42.42.13:2379 isLeader=false
+c6ec829432880cc3: name=etcd1 peerURLs=https://172.42.42.11:2380 clientURLs=https://172.42.42.11:2379 isLeader=false
+
+[root@master1 bin]# etcdctl --endpoints https://172.42.42.13:2379 --ca-file="/etc/ssl/etcd/ssl/ca.pem" --cert-file="/etc/ssl/etcd/ssl/node-master1.pem" --key-file="/etc/ssl/etcd/ssl/node-master1-key.pem" cluster-health
+member 4f62cd245d00f5f is healthy: got healthy result from https://172.42.42.12:2379
+member 9fb7391c7feee94b is healthy: got healthy result from https://172.42.42.13:2379
+member c6ec829432880cc3 is healthy: got healthy result from https://172.42.42.11:2379
+cluster is healthy
+[root@master1 bin]#
