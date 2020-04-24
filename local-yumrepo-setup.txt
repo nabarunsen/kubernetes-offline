@@ -189,6 +189,20 @@ cd linux
 wget --no-parent https://download.docker.com/linux/centos/docker-ce.repo
 wget --no-parent https://download.docker.com/linux/centos/gpg
 
+
+cd /var/www/html/repos
+mkdir k8sbinary
+cd k8sbinary
+
+wget https://storage.googleapis.com/kubernetes-release/release/v1.17.5/bin/linux/amd64/kubelet
+wget https://storage.googleapis.com/kubernetes-release/release/v1.17.5/bin/linux/amd64/kubeadm
+wget https://storage.googleapis.com/kubernetes-release/release/v1.17.5/bin/linux/amd64/kubectl
+wget https://github.com/etcd-io/etcd/releases/download/v3.3.12/etcd-v3.3.12-linux-amd64.tar.gz
+wget https://github.com/containernetworking/plugins/releases/download/v0.8.5/cni-plugins-linux-amd64-v0.8.5.tgz
+wget https://github.com/projectcalico/calicoctl/releases/download/v3.13.2/calicoctl-linux-amd64
+export VERSION="v1.17.0"
+wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-$VERSION-linux-amd64.tar.gz
+
 [root@master1 linux]# ls -rlt
 total 8
 -rw-r--r--. 1 root root 1627 Oct 18  2019 gpg
@@ -205,3 +219,4 @@ local-extras                                                                    
 local-updates                                                                                 CentOS Updates                                                                                    enabled:    892
 repolist: 11,338
 [root@master2 yum.repos.d]#
+
