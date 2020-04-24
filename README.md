@@ -23,6 +23,9 @@ To deploy the cluster you can use :
 # Install dependencies from ``requirements.txt``
 sudo pip3 install -r requirements.txt
 
+### PLEASE Follow Kubespray Installation and Local Yum repo installation for bare metal offilne istallation
+
+
 # Copy ``inventory/sample`` as ``inventory/mycluster``
 cp -rfp inventory/sample inventory/mycluster
 
